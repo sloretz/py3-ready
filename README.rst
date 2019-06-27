@@ -10,9 +10,8 @@ Usage
 check-apt
 :::::::::
 
-This checks uses **apt** to check if a debian package recursively depends on python 2.
-It exits with code 0 if the package does not depend on python2.
-The exit code is 1 if it does depend on python.
+This uses **apt** to check if a debian package recursively depends on python 2.
+It exits with code 1 if the package does depend on python 2, otherwise the exit code is 0.
 
 ::
 
