@@ -18,7 +18,7 @@ The exit code is 1 if it does depend on python.
 
     py3-ready check-apt libboost-python-dev
 
-Passing **--dot** outputs the dependency graph in `DOT https://www.graphviz.org/doc/info/lang.html`_ format.
+Passing **--dot** outputs the dependency graph in `DOT <https://www.graphviz.org/doc/info/lang.html>`_ format.
 
 ::
     py3-ready check-apt --dot libboost-all-dev
