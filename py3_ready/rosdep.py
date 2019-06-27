@@ -147,7 +147,7 @@ class CheckRosdepCommand:
                         start_pkg = edge[0]
                         break
                 first_edge = (
-                    args.key,
+                    'rosdep: ' + args.key,
                     start_pkg,
                     'rosdep'
                 )
