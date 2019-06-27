@@ -16,13 +16,15 @@ import sys
 import argparse
 
 from .apt_tracer import AptTracerCommand
+from .rosdep import CheckRosdepCommand
 
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
     cmd_classes = [
-        AptTracerCommand
+        AptTracerCommand,
+        CheckRosdepCommand
     ]
 
     for cmd_class in cmd_classes:
