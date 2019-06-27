@@ -64,6 +64,7 @@ class AptTracer(DependencyTracer):
                 # Only walk upstream dependencies
                 if base_dep.rawtype in ['Depends', 'PreDepends', 'Suggests', 'Recommends']:
                     if self._cache.is_virtual_package(base_dep.name):
+                        virtual_to_target = False
                         for pkg in self._cache.get_providing_packages(base_dep.name):
                             if self._trace_path(pkg, target):
                                 leads_to_target = True
@@ -71,7 +72,10 @@ class AptTracer(DependencyTracer):
                                 edge2 = (base_dep.name, pkg.name, 'virtual')
                                 self._edges_to_target.append(edge1)
                                 self._edges_to_target.append(edge2)
-                                self._nodes_to_target.add(base_dep.name)
+                                self._nodes_to_target.add(pkg.name)
+                                virtual_to_target = True
+                        if virtual_to_target:
+                            self._nodes_to_target.add(base_dep.name)
                     else:
                         pkg = self._cache.get(base_dep.name)
                         if pkg is None:
