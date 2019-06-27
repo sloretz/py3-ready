@@ -9,7 +9,7 @@ Usage
 check-rosdep
 :::::::::
 
-This uses **apt** to check if a rosdep key recursively depends on python 2.
+This uses **rosdep** and **apt** to check if a rosdep key recursively depends on python 2.
 It exits with code 1 if the package does depend on python 2, otherwise the exit code is 0.
 
 ::
