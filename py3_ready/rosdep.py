@@ -103,6 +103,9 @@ class CheckRosdepCommand:
         parser.add_argument('--quiet', action='store_true')
         parser.add_argument(
             '--dot', action='store_true', help='output DOT graph')
+        parser.add_argument(
+            '--target', default='python',
+            help='Debian package to trace to (default python)')
 
     def do_command(self, args):
         if not is_rosdep_initialized():
@@ -123,7 +126,7 @@ class CheckRosdepCommand:
             if isinstance(installer, AptInstaller):
                 apt_depends = pkgs
 
-        target = "python"
+        target = args.target
 
         if not apt_depends:
             if not args.quiet:
