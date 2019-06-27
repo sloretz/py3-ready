@@ -15,23 +15,11 @@ It exits with code 1 if the package does depend on python 2, otherwise the exit 
 
 ::
 
-    py3-ready check-apt libboost-python-dev
-
-Output
-
-::
-
     $ py3-ready check-apt libboost-python-dev
     libboost-python-dev depends on python
 
 
 Passing **--dot** outputs the dependency graph in `DOT <https://www.graphviz.org/doc/info/lang.html>`_ format.
-
-::
-
-    py3-ready check-apt --dot libboost-all-dev
-
-Output
 
 ::
 
@@ -63,17 +51,13 @@ Output
 By default this looks for dependencies on the debian package named **python**.
 Use **--target** to change this name.
 
+
 ::
 
-    py3-ready check-apt --target python3 libboost-all-dev
+    $ py3-ready check-apt --target python3 python3-apt     
+    python3-apt depends on python3
 
 Use **--quiet** to suppress warnings and human readable output.
-
-::
-
-    py3-ready check-apt --dot --quiet libboost-python-dev
-
-Output
 
 ::
 
