@@ -138,7 +138,10 @@ class CheckRosdepCommand:
         for apt_depend in apt_depends:
             tracer = AptTracer(quiet=args.quiet)
 
-            paths = tracer.trace_paths(apt_depend, target)
+            try:
+                paths = tracer.trace_paths(apt_depend, target)
+            except KeyError:
+                return 2
 
             if paths:
                 start_pkg = None

@@ -33,15 +33,25 @@ class AptTracer(DependencyTracer):
         self._quiet = quiet
 
     def trace_paths(self, start: str, target: str):
-        start = self._cache.get(start)
-        target = self._cache.get(target)
+        start_pkg = self._cache.get(start)
+        if start_pkg is None:
+            msg = "'{}' not in apt cache.".format(start)
+            if not self._quiet:
+                sys.stderr.write(msg + '\n')
+            raise KeyError(msg)
+        target_pkg = self._cache.get(target)
+        if target_pkg is None:
+            msg = "'{}' not in apt cache.".format(target)
+            if not self._quiet:
+                sys.stderr.write(msg + '\n')
+            raise KeyError(msg)
         self._visited_nodes = []
         self._nodes_to_target = set([])
         self._edges_to_target = []
         # Descend through dependency
-        if self._trace_path(start, target):
-            self._edges_to_target.append((start.name, None, None))
-            self._nodes_to_target.add(start.name)
+        if self._trace_path(start_pkg, target_pkg):
+            self._edges_to_target.append((start, None, None))
+            self._nodes_to_target.add(start)
         # TODO(sloretz) why are edges sometimes repeated?
         return list(set(self._edges_to_target))
 
@@ -125,7 +135,11 @@ class AptTracerCommand:
 
         tracer = AptTracer(quiet=args.quiet)
 
-        paths = tracer.trace_paths(start, target)
+        try:
+            paths = tracer.trace_paths(start, target)
+        except KeyError:
+            return 2
+
         if args.dot:
             print(paths_to_dot(paths, edge_legend=APT_EDGE_LEGEND))
         elif not args.quiet:
