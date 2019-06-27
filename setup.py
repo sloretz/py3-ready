@@ -14,6 +14,9 @@
 
 from setuptools import setup
 
+with open("README.rst", "r") as fin:
+  long_description = fin.read()
+
 setup(
     name='py3-ready',
     version='0.1.0',
@@ -32,6 +35,8 @@ setup(
         'License :: OSI Approved :: Apache Software License'
     ],
     description='A tool to identify dependencies on python 2.',
+    long_description=long_description,
+    long_description_content_type="text/x-rst",
     license='Apache License 2.0',
     install_requires=[],  # TODO(sloretz) what to do if deps are debian packages?
 )
