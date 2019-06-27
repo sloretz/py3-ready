@@ -25,7 +25,7 @@ Passing **--dot** outputs the dependency graph in `DOT <https://www.graphviz.org
 
 
 By default this looks for dependencies on the debian package named **python**.
-Use **--target** to change which package to look for recursive dependency.
+Use **--target** to change this name.
 
 ::
 
