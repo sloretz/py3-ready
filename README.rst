@@ -21,6 +21,7 @@ The exit code is 1 if it does depend on python.
 Passing **--dot** outputs the dependency graph in `DOT <https://www.graphviz.org/doc/info/lang.html>`_ format.
 
 ::
+
     py3-ready check-apt --dot libboost-all-dev
 
 
@@ -28,6 +29,7 @@ By default this looks for dependencies on the debian package named **python**.
 Use **--target** to change which package to look for recursive dependency.
 
 ::
+
     py3-ready check-apt --target python3 libboost-all-dev
 
 Use **--quiet** to suppress warnings and human readable output.
