@@ -18,7 +18,6 @@ It exits with code 1 if the package does depend on python 2, otherwise the exit 
     py3-ready check-apt libboost-python-dev
 
 Output
-%%%%%%
 
 ::
 
@@ -33,7 +32,6 @@ Passing **--dot** outputs the dependency graph in `DOT <https://www.graphviz.org
     py3-ready check-apt --dot libboost-all-dev
 
 Output
-%%%%%%
 
 ::
 
@@ -76,7 +74,6 @@ Use **--quiet** to suppress warnings and human readable output.
     py3-ready check-apt --dot --quiet libboost-python-dev
 
 Output
-%%%%%%
 
 ::
 
