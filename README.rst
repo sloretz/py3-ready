@@ -6,11 +6,13 @@ This is a tool for checking if your ROS package or its dependencies depend on py
 
 Usage
 ^^^^^
+All commands exit with code 1 if the package does depend on python 2, and 0 if does not.
+If any unrecoverable error occurs then the exit code is 2.
+
 check-rosdep
 :::::::::
 
 This uses **rosdep** and **apt** to check if a rosdep key recursively depends on python 2.
-It exits with code 1 if the package does depend on python 2, otherwise the exit code is 0.
 
 ::
 
@@ -50,7 +52,6 @@ check-apt
 :::::::::
 
 This uses **apt** to check if a debian package recursively depends on python 2.
-It exits with code 1 if the package does depend on python 2, otherwise the exit code is 0.
 
 ::
 
