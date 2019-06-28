@@ -121,7 +121,7 @@ class RosdepTracer(DependencyTracer):
         all_paths = []
         if not apt_depends:
             if not self._quiet:
-                print('{} might not depend on {}'.format(apt.key, target))
+                print('{} might not depend on {}'.format(start, target))
         else:
             for apt_depend in apt_depends:
                 tracer = AptTracer(quiet=self._quiet)
