@@ -14,14 +14,17 @@
 
 """Tools for checking dependencies of package.xml files."""
 
+from __future__ import print_function
+
 import os
 import sys
 
 from .apt_tracer import APT_EDGE_LEGEND
-from .apt_tracer import AptTracer
 from .dependency_tracer import DependencyTracer
 from .dot import paths_to_dot
 from .rosdep import is_rosdep_initialized
+from .rosdep import ROSDEP_EDGE_LEGEND
+from .rosdep import RosdepTracer
 
 from apt.cache import Cache
 from catkin_pkg.package import parse_package
@@ -35,7 +38,6 @@ from rospkg.manifest import parse_manifest_file
 def get_rospack_manifest(path, rospack):
     if path.endswith(PACKAGE_FILE):
         path = os.path.dirname(path)
-    print(path)
     # TODO(sloretz) why does this raise with PACKAGE_FILE?
     return parse_manifest_file(path, MANIFEST_FILE, rospack=rospack)
 
@@ -62,23 +64,17 @@ class PackageXMLTracer(DependencyTracer):
 
         self._visited_pkgs = []
         self._pkgs_to_target = set([])
+        self._visited_rosdeps = []
+        self._rosdeps_to_target = set([])
         self._edges_to_target = []
-        # TODO(sloretz) must recursively trace package.xml files here
-        # because one package could depend on another package in the system
-        # rospack can find them
-        # each key can be a ros package or a rosdep key, and paths from both need to be merged
-        # graph nodes should be rosdep: for rosdep keys and rospkg for ros packages
-        # ros packages will need a legend for each type of dependency
-        if self._trace_path(start_pkg, target):
-            self._edges_to_target.append((start, None, None))
-            self._nodes_to_target.add(start)
+        self._trace_path(start_pkg, target)
         return list(set(self._edges_to_target))
-        # TODO(sloretz) return list of 3-tuples (start: str, end: str, type: str)
 
     def _trace_path(self, start, target):
         """return true if path leads to target debian package"""
         if start.name in self._visited_pkgs:
             return start.name in self._pkgs_to_target
+        self._visited_pkgs.append(start.name)
 
         rosdep_keys = get_rosdeps(start, self._rospack)
 
@@ -100,21 +96,39 @@ class PackageXMLTracer(DependencyTracer):
         for dep in start.group_depends:
             depends.append((dep, 'group_depend'))
 
+        leads_to_target = False
         for dep, rawtype in depends:
             if dep.name in rosdep_keys:
-                print(dep.name, "is a rosdep key")
+                if dep.name in self._visited_rosdeps:
+                    return dep.name in self._rosdeps_to_target
+                self._visited_rosdeps.append(dep.name)
+                # Trace rosdep key to target
+                tracer = RosdepTracer(cache=self._cache, quiet=self._quiet)
+                rosdep_paths = tracer.trace_paths(dep.name, target)
+                if rosdep_paths:
+                    first_edge = (
+                        'pkg: ' + start.name,
+                        'rosdep: ' + dep.name,
+                        rawtype
+                    )
+                    self._edges_to_target.append(first_edge)
+                    self._edges_to_target.extend(rosdep_paths)
+                    self._pkgs_to_target.add(start.name)
+                    leads_to_target = True
             else:
-                print(dep.name, "is a ros package at", self._rospack.get_path(dep.name))
+                pkg = parse_package(self._rospack.get_path(dep.name))
+                if self._trace_path(pkg, target):
+                    first_edge = (
+                        'pkg: ' + start.name,
+                        'pkg: ' + dep.name,
+                        rawtype
+                    )
+                    self._edges_to_target.append(first_edge)
+                    self._pkgs_to_target.add(start.name)
+                    leads_to_target = True
 
-        return False
-
-        # TODO(sloretz) for each dep, is it a package or rosdep key?
-        # this is what `rospack rosdep0` does
-        # if it's a rosdep key, ask rosdep to resolve it for us
-        # then use AptTracer to get the apt dependencies for it
-        # if it's a ros package then call _trace_path on it to do the same
-        # if it returns true then we depend on py2 because the ros package does
-        # too
+        # print(start.name, leads_to_target)
+        return leads_to_target
 
 
 PACKAGE_XML_EDGE_LEGEND = {
@@ -147,24 +161,28 @@ class CheckPackageXMLCommand(object):
         # TODO option to output just the rosdep keys that depend on python
 
     def do_command(self, args):
-        if not is_rosdep_initialized():
-            sys.stderr.write(
-                'The rosdep database is not ready to be used. '
-                'Run \n\n\trosdep resolve {}\n\n'
-                'for instructions on how to fix this.\n'.format(
-                    args.key))
-            return 2
-
         all_paths = []
         tracer = PackageXMLTracer(quiet=args.quiet)
 
         try:
-            paths = tracer.trace_paths(args.path, args.target)
+            all_paths = tracer.trace_paths(args.path, args.target)
         except OSError as e:
             sys.stderr.write(str(e) + '\n')
             return 2
         except KeyError:
             return 2
+
+        if args.dot:
+            legend = {}
+            legend.update(APT_EDGE_LEGEND)
+            legend.update(ROSDEP_EDGE_LEGEND)
+            legend.update(PACKAGE_XML_EDGE_LEGEND)
+            print(paths_to_dot(all_paths, edge_legend=legend))
+        elif not args.quiet:
+            if all_paths:
+                print('{} depends on {}'.format(args.path, args.target))
+            else:
+                print('{} does not depend on {}'.format(args.path, args.target))
 
         if all_paths:
             # non-zero exit code to indicate it does depend on target
