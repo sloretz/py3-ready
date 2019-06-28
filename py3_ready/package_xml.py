@@ -58,6 +58,11 @@ class PackageXMLTracer(DependecyTracer):
             return start.name in self._pkgs_to_target
 
         # TODO(sloretz) for each dep, is it a package or rosdep key?
+        # if it's a rosdep key, ask rosdep to resolve it for us
+        # then use AptTracer to get the apt dependencies for it
+        # if it's a ros package then call _trace_path on it to do the same
+        # if it returns true then we depend on py2 because the ros package does
+        # too
 
 
 PACKAGE_XML_EDGE_LEGEND = {
