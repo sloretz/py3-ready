@@ -127,7 +127,6 @@ class PackageXMLTracer(DependencyTracer):
                     self._pkgs_to_target.add(start.name)
                     leads_to_target = True
 
-        # print(start.name, leads_to_target)
         return leads_to_target
 
 
@@ -158,7 +157,6 @@ class CheckPackageXMLCommand(object):
         parser.add_argument(
             '--target', default='python',
             help='Debian package to trace to (default python)')
-        # TODO option to output just the rosdep keys that depend on python
 
     def do_command(self, args):
         all_paths = []
