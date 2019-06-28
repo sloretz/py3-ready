@@ -21,6 +21,7 @@ import sys
 
 from .apt_tracer import APT_EDGE_LEGEND
 from .apt_tracer import AptTracer
+from .dependency_tracer import DependencyTracer
 from .dot import paths_to_dot
 
 from apt.cache import Cache
@@ -88,6 +89,60 @@ def resolve_rosdep_key(key, quiet=False):
     return {installer: resolved}
 
 
+class RosdepTracer(DependencyTracer):
+
+    def __init__(self, cache=None, quiet=True):
+        if not cache:
+            cache = Cache()
+        self._cache = cache
+        self._quiet = quiet
+
+    def trace_paths(self, start, target):
+        if not is_rosdep_initialized():
+            msg = ('The rosdep database is not ready to be used. '
+                'Run \n\n\trosdep resolve {}\n\n'
+                'for instructions on how to fix this.\n'.format(start))
+            if not self._quiet:
+                print(msg)
+            raise KeyError(msg)
+
+        resolved = resolve_rosdep_key(start)
+        if resolved is None:
+            msg = 'Could not resolve rosdep key {}\n'.format(start)
+            if not self._quiet:
+                print(msg)
+            raise KeyError(msg)
+
+        apt_depends = []
+        for installer, pkgs in resolved.items():
+            if isinstance(installer, AptInstaller):
+                apt_depends = pkgs
+
+        all_paths = []
+        if not apt_depends:
+            if not self._quiet:
+                print('{} might not depend on {}'.format(apt.key, target))
+        else:
+            for apt_depend in apt_depends:
+                tracer = AptTracer(quiet=self._quiet)
+
+                paths = tracer.trace_paths(apt_depend, target)
+                if paths:
+                    start_pkg = None
+                    for edge in paths:
+                        if edge[1] is None:
+                            start_pkg = edge[0]
+                            break
+                    first_edge = (
+                        'rosdep: ' + start,
+                        start_pkg,
+                        'rosdep'
+                    )
+                    paths.append(first_edge)
+                    all_paths.extend(paths)
+        return all_paths
+
+
 ROSDEP_EDGE_LEGEND = {
     'rosdep': '[color=orange]',
 }
@@ -110,54 +165,12 @@ class CheckRosdepCommand:
             help='Debian package to trace to (default python)')
 
     def do_command(self, args):
-        if not is_rosdep_initialized():
-            sys.stderr.write(
-                'The rosdep database is not ready to be used. '
-                'Run \n\n\trosdep resolve {}\n\n'
-                'for instructions on how to fix this.\n'.format(
-                    args.key))
+        tracer = RosdepTracer(quiet=args.quiet)
+
+        try:
+            all_paths = tracer.trace_paths(args.key, args.target)
+        except KeyError:
             return 2
-
-        resolved = resolve_rosdep_key(args.key)
-        if resolved is None:
-            return 2
-
-        apt_depends = []
-
-        for installer, pkgs in resolved.items():
-            if isinstance(installer, AptInstaller):
-                apt_depends = pkgs
-
-        target = args.target
-
-        if not apt_depends:
-            if not args.quiet:
-                print('{} might not depend on {}'.format(apt.key, target))
-
-        all_paths = []
-        cache = Cache()
-
-        for apt_depend in apt_depends:
-            tracer = AptTracer(quiet=args.quiet)
-
-            try:
-                paths = tracer.trace_paths(apt_depend, target)
-            except KeyError:
-                return 2
-
-            if paths:
-                start_pkg = None
-                for edge in paths:
-                    if edge[1] is None:
-                        start_pkg = edge[0]
-                        break
-                first_edge = (
-                    'rosdep: ' + args.key,
-                    start_pkg,
-                    'rosdep'
-                )
-                paths.append(first_edge)
-                all_paths.extend(paths)
 
         if args.dot:
             legend = {}
@@ -166,10 +179,9 @@ class CheckRosdepCommand:
             print(paths_to_dot(list(set(all_paths)), edge_legend=legend))
         elif not args.quiet:
             if all_paths:
-                print('rosdep key {} depends on {}'.format(args.key, target))
+                print('rosdep key {} depends on {}'.format(args.key, args.target))
             else:
-                # TODO
-                print('rosdep key {} does not depend on {}'.format(args.key, target))
+                print('rosdep key {} does not depend on {}'.format(args.key, args.target))
 
         if all_paths:
             # non-zero exit code to indicate it does depend on target
