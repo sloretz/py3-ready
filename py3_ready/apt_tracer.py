@@ -14,6 +14,8 @@
 
 """Tools for walking through and tracing debian package dependencies.""" 
 
+from __future__ import print_function
+
 import copy
 import sys
 
@@ -32,7 +34,7 @@ class AptTracer(DependencyTracer):
         self._cache = cache
         self._quiet = quiet
 
-    def trace_paths(self, start: str, target: str):
+    def trace_paths(self, start, target):
         start_pkg = self._cache.get(start)
         if start_pkg is None:
             msg = "'{}' not in apt cache.".format(start)
@@ -111,7 +113,7 @@ APT_EDGE_LEGEND = {
 }
 
 
-class AptTracerCommand:
+class AptTracerCommand(object):
 
     COMMAND_NAME='check-apt'
     COMMAND_HELP='check if apt package depends on python 2'

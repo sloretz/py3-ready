@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Interface for tracing package dependencies.""" 
+"""Interface for tracing package dependencies."""
 
 
-class DependencyTracer:
+class DependencyTracer(object):
 
-    def trace_paths(self, start: str, target: str):
+    def trace_paths(self, start, target):
         raise NotImplementedError()
