@@ -96,6 +96,7 @@ class RosdepTracer(DependencyTracer):
             cache = Cache()
         self._cache = cache
         self._quiet = quiet
+        self._tracer = AptTracer(quiet=self._quiet)
 
     def trace_paths(self, start, target):
         if not is_rosdep_initialized():
@@ -125,9 +126,7 @@ class RosdepTracer(DependencyTracer):
                     '{} did not resolve to an apt package\n'.format(start))
         else:
             for apt_depend in apt_depends:
-                tracer = AptTracer(quiet=self._quiet)
-
-                paths = tracer.trace_paths(apt_depend, target)
+                paths = self._tracer.trace_paths(apt_depend, target)
                 if paths:
                     start_pkg = None
                     for edge in paths:

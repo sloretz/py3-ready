@@ -33,6 +33,7 @@ class AptTracer(DependencyTracer):
             cache = Cache()
         self._cache = cache
         self._quiet = quiet
+        self._last_target = None
 
     def trace_paths(self, start, target):
         start_pkg = self._cache.get(start)
@@ -47,9 +48,13 @@ class AptTracer(DependencyTracer):
             if not self._quiet:
                 sys.stderr.write(msg + '\n')
             raise KeyError(msg)
-        self._visited_nodes = []
-        self._nodes_to_target = set([])
-        self._edges_to_target = []
+
+        if target != self._last_target:
+            self._last_target = target
+            # Reuse cache if target is the same
+            self._visited_nodes = []
+            self._nodes_to_target = set([])
+            self._edges_to_target = []
         # Descend through dependency
         if self._trace_path(start_pkg, target_pkg):
             self._edges_to_target.append((start, None, None))

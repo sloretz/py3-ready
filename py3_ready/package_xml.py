@@ -56,6 +56,7 @@ class PackageXMLTracer(DependencyTracer):
         self._cache = cache
         self._quiet = quiet
         self._rospack = RosPack()
+        self._tracer = RosdepTracer(cache=self._cache, quiet=self._quiet)
 
     def trace_paths(self, start, target):
         # start: path to a ROS package
@@ -106,8 +107,7 @@ class PackageXMLTracer(DependencyTracer):
                 else:
                     self._visited_rosdeps.append(dep.name)
                     # Trace rosdep key to target
-                    tracer = RosdepTracer(cache=self._cache, quiet=self._quiet)
-                    rosdep_paths = tracer.trace_paths(dep.name, target)
+                    rosdep_paths = self._tracer.trace_paths(dep.name, target)
                     if rosdep_paths:
                         dep_leads_to_target = True
                         self._edges_to_target.extend(rosdep_paths)
