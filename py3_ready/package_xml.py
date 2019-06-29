@@ -99,22 +99,28 @@ class PackageXMLTracer(DependencyTracer):
         leads_to_target = False
         for dep, rawtype in depends:
             if dep.name in rosdep_keys:
+                dep_leads_to_target = False
                 if dep.name in self._visited_rosdeps:
-                    return dep.name in self._rosdeps_to_target
-                self._visited_rosdeps.append(dep.name)
-                # Trace rosdep key to target
-                tracer = RosdepTracer(cache=self._cache, quiet=self._quiet)
-                rosdep_paths = tracer.trace_paths(dep.name, target)
-                if rosdep_paths:
+                    if dep.name in self._rosdeps_to_target:
+                        dep_leads_to_target = True
+                else:
+                    self._visited_rosdeps.append(dep.name)
+                    # Trace rosdep key to target
+                    tracer = RosdepTracer(cache=self._cache, quiet=self._quiet)
+                    rosdep_paths = tracer.trace_paths(dep.name, target)
+                    if rosdep_paths:
+                        dep_leads_to_target = True
+                        self._edges_to_target.extend(rosdep_paths)
+                        self._rosdeps_to_target.add(dep.name)
+                if dep_leads_to_target:
+                    leads_to_target = True
                     first_edge = (
                         'pkg: ' + start.name,
                         'rosdep: ' + dep.name,
                         rawtype
                     )
                     self._edges_to_target.append(first_edge)
-                    self._edges_to_target.extend(rosdep_paths)
                     self._pkgs_to_target.add(start.name)
-                    self._rosdeps_to_target.add(dep.name)
                     leads_to_target = True
             else:
                 pkg = parse_package(self._rospack.get_path(dep.name))
