@@ -114,6 +114,7 @@ class PackageXMLTracer(DependencyTracer):
                     self._edges_to_target.append(first_edge)
                     self._edges_to_target.extend(rosdep_paths)
                     self._pkgs_to_target.add(start.name)
+                    self._rosdeps_to_target.add(dep.name)
                     leads_to_target = True
             else:
                 pkg = parse_package(self._rospack.get_path(dep.name))
