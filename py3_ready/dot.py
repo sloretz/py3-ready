@@ -13,11 +13,14 @@
 # limitations under the License.
 
 
-def paths_to_dot(paths, edge_legend=None):
+def paths_to_dot(paths, edge_legend=None, node_legend=None):
     """Given dependency paths, output in dot format for graphviz."""
     if edge_legend is None:
         edge_legend = {}
+    if node_legend is None:
+        node_legend = {}
     edges = []
+    nodes = set()
     for edge in paths:
         style = ''
         if edge.edge_type in edge_legend:
@@ -27,5 +30,16 @@ def paths_to_dot(paths, edge_legend=None):
             end=edge.end.name,
             style=style,
             rawtype=edge.edge_type))
+        nodes.add(edge.start)
+        nodes.add(edge.end)
+    node_dot = []
+    for node in nodes:
+        style = ''
+        if node.node_type in node_legend:
+            style = node_legend[node.node_type]
+        node_dot.append('  "{name}"{style};  // {ntype}\n'.format(
+            name=node.name, style=style, ntype=node.node_type))
 
-    return 'digraph G {{\n{edges}}}'.format(edges=''.join(edges))
+    return 'digraph G {{\n{edges}\n{nodes}}}'.format(
+        edges=''.join(edges),
+        nodes=''.join(node_dot))
