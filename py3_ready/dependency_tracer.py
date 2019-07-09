@@ -99,9 +99,16 @@ class TracerCache(object):
             yield from self._edges[node]
 
     def recursive_edges(self, node):
-        for edge in self.edges(node):
-            yield edge
-            yield from self.recursive_edges(edge.end)
+
+        def _recursive_edges(node, edges):
+            for edge in self.edges(node):
+                if edge not in edges:
+                    edges.add(edge)
+                    _recursive_edges(edge.end, edges)
+
+        edges = set()
+        _recursive_edges(node, edges)
+        yield from edges
 
     def add_edge(self, edge):
         if edge.start not in self._edges:
