@@ -19,13 +19,13 @@ def paths_to_dot(paths, edge_legend=None):
         edge_legend = {}
     edges = []
     for edge in paths:
-        start, end, rawtype = edge
         style = ''
-        if not start or not end:
-            continue
-        if rawtype in edge_legend:
-            style = edge_legend[rawtype]
+        if edge.edge_type in edge_legend:
+            style = edge_legend[edge.edge_type]
         edges.append('  "{beg}" -> "{end}"{style};  // {rawtype}\n'.format(
-            beg=start, end=end, style=style, rawtype=rawtype))
+            beg=edge.start.name,
+            end=edge.end.name,
+            style=style,
+            rawtype=edge.edge_type))
 
     return 'digraph G {{\n{edges}}}'.format(edges=''.join(edges))

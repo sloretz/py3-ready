@@ -20,81 +20,99 @@ import copy
 import sys
 
 from .dependency_tracer import DependencyTracer
+from .dependency_tracer import Edge
+from .dependency_tracer import Node
+from .dependency_tracer import TracerCache
 from .dot import paths_to_dot
 
 from apt.cache import Cache
 from apt.package import Package
 
+APT_NODE = 'apt'
+
 
 class AptTracer(DependencyTracer):
 
-    def __init__(self, cache=None, quiet=True):
-        if not cache:
-            cache = Cache()
-        self._cache = cache
+    def __init__(self, apt_cache=None, quiet=True):
+        if not apt_cache:
+            apt_cache = Cache()
+        self._apt_cache = apt_cache
         self._quiet = quiet
-        self._last_target = None
 
-    def trace_paths(self, start, target):
-        start_pkg = self._cache.get(start)
+    def trace_paths(self, start, target, cache=None):
+        start_pkg = self._apt_cache.get(start)
         if start_pkg is None:
             msg = "'{}' not in apt cache.".format(start)
             if not self._quiet:
                 sys.stderr.write(msg + '\n')
             raise KeyError(msg)
-        target_pkg = self._cache.get(target)
+        target_pkg = self._apt_cache.get(target)
         if target_pkg is None:
             msg = "'{}' not in apt cache.".format(target)
             if not self._quiet:
                 sys.stderr.write(msg + '\n')
             raise KeyError(msg)
 
-        if target != self._last_target:
-            self._last_target = target
-            # Reuse cache if target is the same
-            self._visited_nodes = []
-            self._nodes_to_target = set([])
-            self._edges_to_target = []
+        self._edges_to_target = []
+        self._deferred_pkgs = set()
+        if not cache:
+            self._cache = TracerCache()
+
         # Descend through dependency
-        if self._trace_path(start_pkg, target_pkg):
-            self._edges_to_target.append((start, None, None))
-            self._nodes_to_target.add(start)
+        self._trace_path(start_pkg, target_pkg)
+        # Need extra passes for circular dependencies
+        while self._deferred_pkgs:
+            def_pkgs = self._deferred_pkgs
+            self._deferred_pkgs = set()
+            for def_pkg in def_pkgs:
+                self._trace_path(def_pkg, target_pkg)
         # TODO(sloretz) why are edges sometimes repeated?
         return list(set(self._edges_to_target))
 
     def _trace_path(self, start, target):
         """Depth first search to trace paths to target."""
-        if start.name in self._visited_nodes:
-            return start.name in self._nodes_to_target
-        self._visited_nodes.append(start.name)
         if start.name == target.name:
-            # Found target, add path to paths
+            # Found target
             return True
+        start_node = Node(start.name, APT_NODE)
+        if self._cache.check_visited(start_node):
+            if self._cache.check_fully_explored(start_node):
+                leads_to_target = self._cache.check_leads_to_target(start_node)
+                if leads_to_target:
+                    self._edges_to_target.extend(self._cache.recursive_edges(start_node))
+                return leads_to_target
+            else:
+                # Defer checks on circular dependencies
+                self._deferred_pkgs.add(start)
+                return False
+        self._cache.visit(start_node)
         if not start.candidate.dependencies:
             # lowest level and target not found
+            self._cache.mark_leads_to_target(start_node, False)
             return False
         leads_to_target = False
         for dependency in start.candidate.dependencies:
-            rawtype = dependency.rawtype
             # Check all the candidates that can satisfy this dependency
             for base_dep in dependency:
                 # Only walk upstream dependencies
                 if base_dep.rawtype in ['Depends', 'PreDepends', 'Suggests', 'Recommends']:
-                    if self._cache.is_virtual_package(base_dep.name):
+                    if self._apt_cache.is_virtual_package(base_dep.name):
                         virtual_to_target = False
-                        for pkg in self._cache.get_providing_packages(base_dep.name):
+                        base_dep_node = Node(base_dep.name, APT_NODE)
+                        for pkg in self._apt_cache.get_providing_packages(base_dep.name):
                             if self._trace_path(pkg, target):
                                 leads_to_target = True
-                                edge1 = (start.name, base_dep.name, base_dep.rawtype)
-                                edge2 = (base_dep.name, pkg.name, 'virtual')
+                                edge1 = Edge(start_node, base_dep.rawtype, base_dep_node)
+                                pkg_node = Node(pkg.name, APT_NODE)
+                                edge2 = Edge(base_dep_node, 'virtual', pkg_node)
+                                self._cache.add_edge(edge1)
+                                self._cache.add_edge(edge2)
                                 self._edges_to_target.append(edge1)
                                 self._edges_to_target.append(edge2)
-                                self._nodes_to_target.add(pkg.name)
                                 virtual_to_target = True
-                        if virtual_to_target:
-                            self._nodes_to_target.add(base_dep.name)
+                        self._cache.mark_leads_to_target(base_dep_node, virtual_to_target)
                     else:
-                        pkg = self._cache.get(base_dep.name)
+                        pkg = self._apt_cache.get(base_dep.name)
                         if pkg is None:
                             if not self._quiet:
                                 sys.stderr.write(
@@ -103,9 +121,11 @@ class AptTracer(DependencyTracer):
                             continue
                         if self._trace_path(pkg, target):
                             leads_to_target = True
-                            edge = (start.name, pkg.name, base_dep.rawtype)
+                            pkg_node = Node(pkg.name, APT_NODE)
+                            edge = Edge(start_node, base_dep.rawtype, pkg_node)
+                            self._cache.add_edge(edge)
                             self._edges_to_target.append(edge)
-                            self._nodes_to_target.add(base_dep.name)
+        self._cache.mark_leads_to_target(start_node, leads_to_target)
         return leads_to_target
 
 
