@@ -72,7 +72,7 @@ class PackageCache(object):
 
 
 
-class PackageXMLTracer(DependencyTracer):
+class PackageTracer(DependencyTracer):
 
     def __init__(self, apt_cache=None, quiet=True):
         self._quiet = quiet
@@ -80,9 +80,14 @@ class PackageXMLTracer(DependencyTracer):
         self._package_cache = PackageCache()
 
     def trace_paths(self, start, target, cache=None):
-        # start: path to a ROS package
+        # start: name of a ROS package
         # target: name of a debian package
-        start_pkg = parse_package(start)
+        start_pkg = self._package_cache.find_package(start)
+        if start_pkg is None:
+            if not self._quiet:
+                sys.stderr.write('Failed to find package "{}".'
+                ' Did you remember to source the workspace?\n'.format(start))
+            raise KeyError()
 
         if not cache:
             cache = TracerCache()
@@ -175,7 +180,7 @@ class PackageXMLTracer(DependencyTracer):
         return leads_to_target
 
 
-PACKAGE_XML_EDGE_LEGEND = {
+PACKAGE_EDGE_LEGEND = {
     'build_depend': '[color=pink]',
     'buildtool_depend': '[color=pink]',
     'build_export_depend': '[color=pink]',
@@ -186,20 +191,20 @@ PACKAGE_XML_EDGE_LEGEND = {
     'group_depend': '[color=pink]',
 }
 
-PACKAGE_XML_NODE_LEGEND = {
+PACKAGE_NODE_LEGEND = {
     PACKAGE_NODE: '[color=pink,shape=hexagon]'
 }
 
 
-class CheckPackageXMLCommand(object):
-    COMMAND_NAME='check-package-xml'
-    COMMAND_HELP='check if dependencies in a package.xml depend on python 2'
+class CheckPackageCommand(object):
+    COMMAND_NAME='check-package'
+    COMMAND_HELP='check if a ROS package depends on python 2'
 
     def __init__(self, parser):
         # arguments for key, quiet, and dot output
         parser.add_argument(
-            'path', type=str,
-            help='path to package.xml file to check')
+            'package', type=str,
+            help='Name of a package to check')
         parser.add_argument('--quiet', action='store_true')
         parser.add_argument(
             '--dot', action='store_true', help='output DOT graph')
@@ -209,10 +214,10 @@ class CheckPackageXMLCommand(object):
 
     def do_command(self, args):
         all_paths = []
-        tracer = PackageXMLTracer(quiet=args.quiet)
+        tracer = PackageTracer(quiet=args.quiet)
 
         try:
-            all_paths = tracer.trace_paths(args.path, args.target)
+            all_paths = tracer.trace_paths(args.package, args.target)
         except OSError as e:
             sys.stderr.write(str(e) + '\n')
             return 2
@@ -223,17 +228,17 @@ class CheckPackageXMLCommand(object):
             edge_legend = {}
             edge_legend.update(APT_EDGE_LEGEND)
             edge_legend.update(ROSDEP_EDGE_LEGEND)
-            edge_legend.update(PACKAGE_XML_EDGE_LEGEND)
+            edge_legend.update(PACKAGE_EDGE_LEGEND)
             node_legend = {}
             node_legend.update(ROSDEP_NODE_LEGEND)
-            node_legend.update(PACKAGE_XML_NODE_LEGEND)
+            node_legend.update(PACKAGE_NODE_LEGEND)
             print(paths_to_dot(
                 all_paths,
                 edge_legend=edge_legend,
                 node_legend=node_legend))
         elif not args.quiet:
             if all_paths:
-                print('{} depends on {}'.format(args.path, args.target))
+                print('{} depends on {}'.format(args.package, args.target))
             else:
                 print('{} does not depend on {}'.format(args.path, args.target))
 

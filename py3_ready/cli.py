@@ -17,7 +17,7 @@ import argparse
 
 from .apt_tracer import AptTracerCommand
 from .rosdep import CheckRosdepCommand
-from .package_xml import CheckPackageXMLCommand
+from .package_xml import CheckPackageCommand
 
 def main():
     parser = argparse.ArgumentParser()
@@ -26,7 +26,7 @@ def main():
     cmd_classes = [
         AptTracerCommand,
         CheckRosdepCommand,
-        CheckPackageXMLCommand
+        CheckPackageCommand
     ]
 
     for cmd_class in cmd_classes:
