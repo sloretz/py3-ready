@@ -25,9 +25,11 @@ def paths_to_dot(paths, edge_legend=None, node_legend=None):
         style = ''
         if edge.edge_type in edge_legend:
             style = edge_legend[edge.edge_type]
-        edges.append('  "{beg}" -> "{end}"{style};  // {rawtype}\n'.format(
+        edges.append('  "{beg}%{begtype}" -> "{end}%{endtype}"{style};  // {rawtype}\n'.format(
             beg=edge.start.name,
+            begtype=edge.start.node_type,
             end=edge.end.name,
+            endtype=edge.end.node_type,
             style=style,
             rawtype=edge.edge_type))
         nodes.add(edge.start)
@@ -37,7 +39,7 @@ def paths_to_dot(paths, edge_legend=None, node_legend=None):
         style = ''
         if node.node_type in node_legend:
             style = node_legend[node.node_type]
-        node_dot.append('  "{name}"{style};  // {ntype}\n'.format(
+        node_dot.append('  "{name}%{ntype}"{style}[label="{name}"];  // {ntype}\n'.format(
             name=node.name, style=style, ntype=node.node_type))
 
     return 'digraph G {{\n{edges}\n{nodes}}}'.format(
