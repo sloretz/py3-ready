@@ -20,8 +20,12 @@ import os
 import sys
 
 from .apt_tracer import APT_EDGE_LEGEND
+from .apt_tracer import APT_NODE
 from .apt_tracer import AptTracer
 from .dependency_tracer import DependencyTracer
+from .dependency_tracer import Edge
+from .dependency_tracer import Node
+from .dependency_tracer import TracerCache
 from .dot import paths_to_dot
 
 from apt.cache import Cache
@@ -34,6 +38,9 @@ from rosdep2.sources_list import CACHE_INDEX
 from rosdep2.sources_list import get_sources_cache_dir
 from rosdep2.sources_list import get_sources_list_dir
 from rosdep2.sources_list import SourcesListLoader
+
+
+ROSDEP_NODE = 'rosdep'
 
 
 def is_rosdep_initialized():
@@ -91,14 +98,16 @@ def resolve_rosdep_key(key, quiet=False):
 
 class RosdepTracer(DependencyTracer):
 
-    def __init__(self, cache=None, quiet=True):
-        if not cache:
-            cache = Cache()
-        self._cache = cache
+    def __init__(self, apt_cache=None, quiet=True):
         self._quiet = quiet
-        self._tracer = AptTracer(quiet=self._quiet)
+        self._tracer = AptTracer(apt_cache=apt_cache, quiet=self._quiet)
 
-    def trace_paths(self, start, target):
+    def trace_paths(self, start, target, cache=None):
+        start_node = Node(start, ROSDEP_NODE)
+        if not cache:
+            cache = TracerCache()
+        if cache.check_fully_explored(start_node):
+            return [e for e in cache.recursive_edges(start_node)]
         if not is_rosdep_initialized():
             msg = ('The rosdep database is not ready to be used. '
                 'Run \n\n\trosdep resolve {}\n\n'
@@ -126,25 +135,23 @@ class RosdepTracer(DependencyTracer):
                     '{} did not resolve to an apt package\n'.format(start))
         else:
             for apt_depend in apt_depends:
-                paths = self._tracer.trace_paths(apt_depend, target)
+                paths = self._tracer.trace_paths(apt_depend, target, cache=cache)
                 if paths:
-                    start_pkg = None
-                    for edge in paths:
-                        if edge[1] is None:
-                            start_pkg = edge[0]
-                            break
-                    first_edge = (
-                        'rosdep: ' + start,
-                        start_pkg,
-                        'rosdep'
-                    )
-                    paths.append(first_edge)
+                    apt_node = Node(apt_depend, APT_NODE)
+                    edge = Edge(start_node, 'rosdep', apt_node)
+                    cache.add_edge(edge)
+                    paths.append(edge)
                     all_paths.extend(paths)
+        cache.mark_leads_to_target(start_node, bool(all_paths))
         return all_paths
 
 
 ROSDEP_EDGE_LEGEND = {
     'rosdep': '[color=orange]',
+}
+
+ROSDEP_NODE_LEGEND = {
+    'rosdep':  '[color=orange,shape=rect]',
 }
 
 
@@ -173,10 +180,13 @@ class CheckRosdepCommand:
             return 2
 
         if args.dot:
-            legend = {}
-            legend.update(APT_EDGE_LEGEND)
-            legend.update(ROSDEP_EDGE_LEGEND)
-            print(paths_to_dot(list(set(all_paths)), edge_legend=legend))
+            edge_legend = {}
+            edge_legend.update(APT_EDGE_LEGEND)
+            edge_legend.update(ROSDEP_EDGE_LEGEND)
+            print(
+                paths_to_dot(list(set(all_paths)),
+                edge_legend=edge_legend,
+                node_legend=ROSDEP_NODE_LEGEND))
         elif not args.quiet:
             if all_paths:
                 print('rosdep key {} depends on {}'.format(args.key, args.target))
