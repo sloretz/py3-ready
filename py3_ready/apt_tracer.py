@@ -56,7 +56,8 @@ class AptTracer(DependencyTracer):
         self._edges_to_target = []
         self._deferred_pkgs = set()
         if not cache:
-            self._cache = TracerCache()
+            cache = TracerCache()
+        self._cache = cache
 
         # Descend through dependency
         self._trace_path(start_pkg, target_pkg)
