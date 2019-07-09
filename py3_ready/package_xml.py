@@ -21,63 +21,101 @@ import sys
 
 from .apt_tracer import APT_EDGE_LEGEND
 from .dependency_tracer import DependencyTracer
+from .dependency_tracer import Edge
+from .dependency_tracer import Node
+from .dependency_tracer import TracerCache
 from .dot import paths_to_dot
 from .rosdep import is_rosdep_initialized
 from .rosdep import ROSDEP_EDGE_LEGEND
+from .rosdep import ROSDEP_NODE
+from .rosdep import ROSDEP_NODE_LEGEND
 from .rosdep import RosdepTracer
 
 from apt.cache import Cache
 from catkin_pkg.package import parse_package
-from rospkg import RosPack
-from rospkg.common import PACKAGE_FILE
-from rospkg.common import MANIFEST_FILE
-from rospkg.manifest import InvalidManifest
-from rospkg.manifest import parse_manifest_file
+from catkin_pkg.packages import find_packages
 
 
-def get_rospack_manifest(path, rospack):
-    if path.endswith(PACKAGE_FILE):
-        path = os.path.dirname(path)
-    # TODO(sloretz) why does this raise with PACKAGE_FILE?
-    return parse_manifest_file(path, MANIFEST_FILE, rospack=rospack)
+PACKAGE_NODE='package'
 
 
-def get_rosdeps(pkg, rospack):
-    m = get_rospack_manifest(pkg.filename, rospack)
-    rosdeps = m.rosdeps
-    return [r.name for r in rosdeps]
+class PackageCache(object):
+
+    def __init__(self):
+        # Key: name, Value: parsed package xml file
+        self._packages = self._find_packages(self._get_search_paths())
+
+    def _get_search_paths(self):
+        env_vars = (
+            'AMENT_PREFIX_PATH',
+            'CMAKE_PREFIX_PATH',
+            'COLCON_PREFIX_PATH'
+        )
+        paths = []
+        for var in env_vars:
+            text = os.getenv(var, default='')
+            for path in text.split(':'):
+                if path:
+                    yield path
+
+    def _find_packages(self, search_paths):
+        packages = {}
+        for path in search_paths:
+            for path, pkg in find_packages(path).items():
+                # TODO(sloretz) is this doing overlay workspaces correctly?
+                packages[pkg.name] = pkg
+        return packages
+
+    def find_package(self, name):
+        if name in self._packages:
+            return self._packages[name]
+
 
 
 class PackageXMLTracer(DependencyTracer):
 
-    def __init__(self, cache=None, quiet=True):
-        if not cache:
-            cache = Cache()
-        self._cache = cache
+    def __init__(self, apt_cache=None, quiet=True):
         self._quiet = quiet
-        self._rospack = RosPack()
-        self._tracer = RosdepTracer(cache=self._cache, quiet=self._quiet)
+        self._tracer = RosdepTracer(apt_cache=apt_cache, quiet=self._quiet)
+        self._package_cache = PackageCache()
 
-    def trace_paths(self, start, target):
+    def trace_paths(self, start, target, cache=None):
         # start: path to a ROS package
         # target: name of a debian package
         start_pkg = parse_package(start)
 
+        if not cache:
+            cache = TracerCache()
+        self._cache = cache
+
         self._visited_pkgs = []
+        self._deferred_pkgs = set()
         self._pkgs_to_target = set([])
         self._visited_rosdeps = []
         self._rosdeps_to_target = set([])
-        self._edges_to_target = []
+
         self._trace_path(start_pkg, target)
-        return list(set(self._edges_to_target))
+        # Need extra passes for circular dependencies
+        while self._deferred_pkgs:
+            def_pkgs = self._deferred_pkgs
+            self._deferred_pkgs = set()
+            for def_pkg in def_pkgs:
+                self._trace_path(def_pkg, target)
+        start_node = Node(start_pkg.name, PACKAGE_NODE)
+        return list(set(self._cache.recursive_edges(start_node)))
 
     def _trace_path(self, start, target):
         """return true if path leads to target debian package"""
-        if start.name in self._visited_pkgs:
-            return start.name in self._pkgs_to_target
-        self._visited_pkgs.append(start.name)
-
-        rosdep_keys = get_rosdeps(start, self._rospack)
+        start_node = Node(start.name, PACKAGE_NODE)
+        if self._cache.check_visited(start_node):
+            if self._cache.check_fully_explored(start_node):
+                leads_to_target = self._cache.check_leads_to_target(start_node)
+                return leads_to_target
+            else:
+                # Defer checks on circular dependencies
+                self._deferred_pkgs.add(start)
+                return False
+        self._cache.visit(start_node)
 
         depends = []
         for dep in start.build_depends:
@@ -97,55 +135,59 @@ class PackageXMLTracer(DependencyTracer):
         for dep in start.group_depends:
             depends.append((dep, 'group_depend'))
 
+        rosdep_keys = []
+        for dep, _ in depends:
+            if self._package_cache.find_package(dep.name) is None:
+                rosdep_keys.append(dep.name)
+
         leads_to_target = False
         for dep, rawtype in depends:
             if dep.name in rosdep_keys:
+                dep_node = Node(dep.name, ROSDEP_NODE)
                 dep_leads_to_target = False
-                if dep.name in self._visited_rosdeps:
-                    if dep.name in self._rosdeps_to_target:
-                        dep_leads_to_target = True
+                if self._cache.check_fully_explored(dep_node):
+                    dep_leads_to_target = self._cache.check_leads_to_target(dep_node)
                 else:
-                    self._visited_rosdeps.append(dep.name)
                     # Trace rosdep key to target
-                    rosdep_paths = self._tracer.trace_paths(dep.name, target)
+                    rosdep_paths = self._tracer.trace_paths(dep.name, target, cache=self._cache)
                     if rosdep_paths:
                         dep_leads_to_target = True
-                        self._edges_to_target.extend(rosdep_paths)
-                        self._rosdeps_to_target.add(dep.name)
                 if dep_leads_to_target:
                     leads_to_target = True
-                    first_edge = (
-                        'pkg: ' + start.name,
-                        'rosdep: ' + dep.name,
-                        rawtype
+                    edge = Edge(
+                        start_node,
+                        rawtype,
+                        dep_node
                     )
-                    self._edges_to_target.append(first_edge)
-                    self._pkgs_to_target.add(start.name)
+                    self._cache.add_edge(edge)
                     leads_to_target = True
             else:
-                pkg = parse_package(self._rospack.get_path(dep.name))
+                pkg = self._package_cache.find_package(dep.name)
+                if pkg is None and not self._quiet:
+                    sys.stderr.write('Failed to find package or rosdep key [{}]\n'.format(dep.name))
+                dep_node = Node(dep.name, PACKAGE_NODE)
                 if self._trace_path(pkg, target):
-                    first_edge = (
-                        'pkg: ' + start.name,
-                        'pkg: ' + dep.name,
-                        rawtype
-                    )
-                    self._edges_to_target.append(first_edge)
-                    self._pkgs_to_target.add(start.name)
+                    edge = Edge(start_node, rawtype, dep_node)
+                    self._cache.add_edge(edge)
                     leads_to_target = True
 
+        self._cache.mark_leads_to_target(start_node, leads_to_target)
         return leads_to_target
 
 
 PACKAGE_XML_EDGE_LEGEND = {
-  'build_depend': '[color=pink]',
-  'buildtool_depend': '[color=pink]',
-  'build_export_depend': '[color=pink]',
-  'buildtool_export_depend': '[color=pink]',
-  'exec_depend': '[color=pink]',
-  'test_depend': '[color=pink]',
-  'doc_depend': '[color=pink]',
-  'group_depend': '[color=pink]',
+    'build_depend': '[color=pink]',
+    'buildtool_depend': '[color=pink]',
+    'build_export_depend': '[color=pink]',
+    'buildtool_export_depend': '[color=pink]',
+    'exec_depend': '[color=pink]',
+    'test_depend': '[color=pink]',
+    'doc_depend': '[color=pink]',
+    'group_depend': '[color=pink]',
+}
+
+PACKAGE_XML_NODE_LEGEND = {
+    PACKAGE_NODE: '[color=pink,shape=hexagon]'
 }
 
 
@@ -178,11 +220,17 @@ class CheckPackageXMLCommand(object):
             return 2
 
         if args.dot:
-            legend = {}
-            legend.update(APT_EDGE_LEGEND)
-            legend.update(ROSDEP_EDGE_LEGEND)
-            legend.update(PACKAGE_XML_EDGE_LEGEND)
-            print(paths_to_dot(all_paths, edge_legend=legend))
+            edge_legend = {}
+            edge_legend.update(APT_EDGE_LEGEND)
+            edge_legend.update(ROSDEP_EDGE_LEGEND)
+            edge_legend.update(PACKAGE_XML_EDGE_LEGEND)
+            node_legend = {}
+            node_legend.update(ROSDEP_NODE_LEGEND)
+            node_legend.update(PACKAGE_XML_NODE_LEGEND)
+            print(paths_to_dot(
+                all_paths,
+                edge_legend=edge_legend,
+                node_legend=node_legend))
         elif not args.quiet:
             if all_paths:
                 print('{} depends on {}'.format(args.path, args.target))
