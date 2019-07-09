@@ -151,7 +151,7 @@ ROSDEP_EDGE_LEGEND = {
 }
 
 ROSDEP_NODE_LEGEND = {
-    'rosdep':  '[color=orange,shape=rect]',
+    ROSDEP_NODE:  '[color=orange,shape=rect]',
 }
 
 
