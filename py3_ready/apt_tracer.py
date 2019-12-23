@@ -40,14 +40,16 @@ class AptTracer(DependencyTracer):
         self._quiet = quiet
 
     def trace_paths(self, start, target, cache=None):
-        start_pkg = self._apt_cache.get(start)
-        if start_pkg is None:
+        if start in self._apt_cache:
+            start_pkg = self._apt_cache[start]
+        else:
             msg = "'{}' not in apt cache.".format(start)
             if not self._quiet:
                 sys.stderr.write(msg + '\n')
             raise KeyError(msg)
-        target_pkg = self._apt_cache.get(target)
-        if target_pkg is None:
+        if target in self._apt_cache:
+            target_pkg = self._apt_cache[target]
+        else:
             msg = "'{}' not in apt cache.".format(target)
             if not self._quiet:
                 sys.stderr.write(msg + '\n')
@@ -113,8 +115,9 @@ class AptTracer(DependencyTracer):
                                 virtual_to_target = True
                         self._cache.mark_leads_to_target(base_dep_node, virtual_to_target)
                     else:
-                        pkg = self._apt_cache.get(base_dep.name)
-                        if pkg is None:
+                        if base_dep.name in self._apt_cache:
+                            pkg = self._apt_cache[base_dep.name]
+                        else:
                             if not self._quiet:
                                 sys.stderr.write(
                                     "'{}' not in apt cache. Used by '{}' as '{}'\n".format(
