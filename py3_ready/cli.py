@@ -15,11 +15,35 @@
 import sys
 import argparse
 
-from .apt_tracer import AptTracerCommand
-from .rosdep import CheckRosdepCommand
-from .package_xml import CheckPackageCommand
+
+def please_install(module, debian_package_suffix):
+    sys.exit("""Unable to import {module}. Please install it on this system.
+
+        sudo apt-get install python{version}-{suffix}""".format(
+            module=module, version= sys.version_info.major,
+            suffix=debian_package_suffix))
+
 
 def main():
+
+    try:
+        import apt
+    except ImportError:
+        please_install('apt', 'apt')
+    from .apt_tracer import AptTracerCommand
+
+    try:
+        import rosdep2
+    except ImportError:
+        please_install('rosdep2', 'rosdep-modules')
+    from .rosdep import CheckRosdepCommand
+
+    try:
+        import catkin_pkg
+    except ImportError:
+        please_install('catkin_pkg', 'catkin-pkg-modules')
+    from .package_xml import CheckPackageCommand
+
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
 
