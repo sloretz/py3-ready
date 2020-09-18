@@ -24,7 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'py3-ready = py3_ready.cli:main',
-	    ]
+        ]
     },
     author='Shane Loretz',
     author_email='sloretz@openrobotics.org',
@@ -38,5 +38,6 @@ setup(
     long_description=long_description,
     long_description_content_type="text/x-rst",
     license='Apache License 2.0',
+    url='https://github.com/osrf/py3-ready',
     install_requires=[],  # TODO(sloretz) what to do if deps are debian packages?
 )
