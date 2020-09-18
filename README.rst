@@ -4,6 +4,50 @@ py3-ready
 
 This is a tool for checking if your ROS package or its dependencies depend on python 2.
 
+Install
+^^^^^^^
+
+This package works on Ubuntu and Debian, and it needs some packages installed on the system.
+
+Install these if the default ``python`` is Python 2 (Ubuntu Bionic, Debian Stretch, etc).
+
+::
+
+    $ sudo apt-get install python-apt
+    $ sudo apt-get install python-rosdep-modules
+    $ sudo apt-get install python-catkin-pkg-modules
+
+Install these if the default ``python`` is Python 3 (Ubuntu  focal, Debian Buster, etc).
+
+::
+
+    $ sudo apt-get install python3-apt
+    $ sudo apt-get install python3-rosdep-modules
+    $ sudo apt-get install python3-catkin-pkg-modules
+
+
+Then install from PyPI.org.
+
+::
+
+    $ pip install py3-ready
+
+If you would like to install from source then create a virtual environment with access to system packages.
+
+::
+
+    $ cd py3-ready/
+    # Set up Python 2 virtual environment
+    $ virtualenv --system-site-packages ssenv2
+    $ . ssenv2/bin/activate
+    $ python setup.py develop
+    $ deactivate
+    # Set up Python 3 virtual environment
+    $ python3 venv --system-site-packages ssenv3
+    $ . ssenv3/bin/activate
+    $ python setup.py develop
+
+
 Usage
 ^^^^^
 All commands exit with code 1 if the package does depend on python 2, and 0 if does not.
@@ -18,7 +62,6 @@ The package must exist in a sourced workspace.
 Use **--quiet** to suppress warnings and human readable output.
 
 ::
-
 
     $ py3-ready check-package catkin
     python-argparse did not resolve to an apt package
